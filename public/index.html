@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>three.js webgl - convex geometry</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body {
+            font-family: Monospace;
+            background-color: #f0f0f0;
+            margin: 0px;
+            overflow: hidden;
+        }
+        #info {
+            position: absolute;
+            color: #fff;
+            top: 0px;
+            width: 100%;
+            padding: 5px;
+            text-align:center;
+        }
+        a {
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div id="info"><a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> - ConvexGeometry</div>
+
+<script src="plugins/threeJS/three.js"></script>
+<script src="plugins/controls/OrbitControls.js"></script>
+<script src="plugins/QuickHull.js"></script>
+<script src="plugins/geometries/ConvexGeometry.js"></script>
+<script src="plugins/WebGL.js"></script>
+<script src="plugins/libs/stats.min.js"></script>
+<script src="js/folding.js"></script>
+<script>
+    if ( WEBGL.isWebGLAvailable() === false ) {
+        document.body.appendChild( WEBGL.getWebGLErrorMessage() );
+    }
+    var group, camera, scene, renderer;
+    init();
+    animate();
+    function init() {
+        scene = new THREE.Scene();
+        renderer = new THREE.WebGLRenderer( { antialias: true } );
+        renderer.setPixelRatio( window.devicePixelRatio );
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        document.body.appendChild( renderer.domElement );
+        // camera
+        camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 1, 10000 );
+        camera.position.set( 0, 50, 50 );
+        scene.add( camera );
+        // controls
+        var controls = new THREE.OrbitControls( camera, renderer.domElement );
+        controls.minDistance = 10;
+        controls.maxDistance = 1000;
+        scene.add( new THREE.AmbientLight( 0x222222 ) );
+        // light
+        var light = new THREE.PointLight( 0xffffff, 1 );
+        camera.add( light );
+        // helper
+        scene.background = new THREE.Color( 0xf0f0f0 );
+
+
+        group = new THREE.Group();
+        scene.add( group );
+        // points
+
+        let r0 = 5, ri = 1, alpha = Math.PI / 100, n = 500, m = 100, beta = 0, a = 1;
+        let maxZ = 0;
+        var vertices = folding(r0, ri, n, m, alpha, beta, a).map(array => array.map(point => {
+            maxZ = Math.max(maxZ, point.z);
+            return new THREE.Vector3(point.x, point.y, point.z)
+        }));
+
+        var material = [
+            new THREE.MeshStandardMaterial( { color : 0xe2dee0, side: THREE.DoubleSide, metalness: 0 } ),
+            new THREE.LineBasicMaterial( { color: 0xed0600 } )
+        ];
+
+
+        var geometry = new THREE.Geometry();
+        vertices.map(array => array.map(point => geometry.vertices.push(point)));
+
+        var color3 = new THREE.Color( 0xf9f3ff );
+
+        for (let j = 0; j <= m; j++) {
+            for (let i = 0; i <= n; i++) {
+                vertices[j][i].z -= maxZ / 2;
+                geometry.vertices.push(vertices[j][i])
+                vertices[j][i].ind = geometry.vertices.length - 1;
+            }
+        }
+
+        for (let j = 2; j <= m; j++) {
+            for (let i = 2; i <= n; i++) {
+                geometry.faces.push(new THREE.Face3(vertices[j - 1][i - 1].ind, vertices[j - 1][i].ind, vertices[j][i - 1].ind, color3));
+                geometry.faces.push(new THREE.Face3(vertices[j][i].ind, vertices[j - 1][i].ind, vertices[j][i - 1].ind, color3))
+            }
+        }
+
+
+        //var line = new THREE.Line( geometry, material[1] );
+
+        //geometry.computeFaceNormals();
+        geometry.computeVertexNormals();
+
+        scene.add( new THREE.Mesh( geometry, material[0] ) );
+        //scene.add( line );
+
+        /*var pointsMaterial = new THREE.PointsMaterial( {
+            color: 0x0080ff,
+            map: texture,
+            size: 1,
+            alphaTest: 0.5
+        } );
+        var pointsGeometry = new THREE.BufferGeometry().setFromPoints( vertices );
+        var points = new THREE.Points( pointsGeometry, pointsMaterial );
+        group.add( points );
+        // convex hull
+        var meshMaterial = new THREE.MeshLambertMaterial( {
+            color: 0xffffff,
+            opacity: 0.5,
+            transparent: true
+        } );
+        var meshGeometry = new THREE.ConvexBufferGeometry( vertices );
+        var mesh = new THREE.Mesh( meshGeometry, meshMaterial );
+        mesh.material.side = THREE.BackSide; // back faces
+        mesh.renderOrder = 0;
+        group.add( mesh );
+        var mesh = new THREE.Mesh( meshGeometry, meshMaterial.clone() );
+        mesh.material.side = THREE.FrontSide; // front faces
+        mesh.renderOrder = 1;
+        group.add( mesh );**/
+        //
+        window.addEventListener( 'resize', onWindowResize, false );
+    }
+    // function randomPoint() {
+    // 	return new THREE.Vector3( THREE.Math.randFloat( - 1, 1 ), THREE.Math.randFloat( - 1, 1 ), THREE.Math.randFloat( - 1, 1 ) );
+    // }
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize( window.innerWidth, window.innerHeight );
+    }
+    function animate() {
+        requestAnimationFrame( animate );
+        render();
+    }
+    function render() {
+        renderer.render( scene, camera );
+    }
+</script>
+
+</body>
+</html>
