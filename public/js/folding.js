@@ -113,8 +113,12 @@ function check(p1, p2) {
     return Math.abs(p1.r - p2.r) < EPS && Math.abs(p2.fi - p1.fi) < EPS && Math.abs(p1.h - p2.h) < EPS;
 }
 
+function findAndSumVectorPolar(p0, p1, p2) {
+    return new PolarPoint(p2.r - p0.r + p1.r, p2.fi - p0.fi + p1.fi, p2.h - p0.h + p1.h);
+}
+
 //solve system of equations
-function solve(p1, p2, l1, l2, ri, g, r0, p0) {
+function solveEquations(p0, p1, p2, l1, l2, ri, g, r0) {
     let last = p0;
     let iteration = initNewtonIteration(p1, p2, l1, l2, ri, g, r0);
     let p = last.decrement(iteration(last));
@@ -128,46 +132,52 @@ function solve(p1, p2, l1, l2, ri, g, r0, p0) {
     return p;
 }
 
-function findAndSumVectorPolar(p0, p1, p2) {
-    let v = Vector.makeFromPoints(p0.toPoint(), p2.toPoint());
-    //return p1.toPoint().add(v).toPolarPoint();
-    return new PolarPoint(p2.r - p0.r + p1.r, p2.fi - p0.fi + p1.fi, p2.h - p0.h + p1.h);
-}
-
 function folding(r0, ri, n, m, alpha, beta, a) {
-    let b = Math.sqrt(2) * a;
-    b = a;
-    let h = a * Math.cos(alpha);
-    let r = r0 + a * Math.sin(alpha);
-    let points = [[], []];
-    points[0].push(new PolarPoint(r0, 0, 0));
-    points[1].push(new PolarPoint(r, 0, h));
-    let p = points[1][0].toPoint();
-    p.y -= a;
-    points[1][-1] = p.toPolarPoint();
-
+    let aHelper = Math.sqrt(3) / 2 * a;
+    let bHelper = a / 2;
+    let cHelper = 2 * sqr(aHelper) * (1 - Math.cos(beta));
+    let h = aHelper * Math.cos(alpha);
+    let r = r0 + aHelper * Math.sin(alpha);
     let riPi = ri / (2 * Math.PI);
     let g = Math.tan(alpha);
+    let points = [[], []];
+    points[0].push(new PolarPoint(r0, 0, 0));
 
-    for (let i = 1; i <= n; i++) {
-        points[0].push(solve(points[0][i - 1], points[1][i - 1], a, b, riPi, g, r0,
-            findAndSumVectorPolar(points[1][i - 2], points[0][i - 1], points[1][i - 1])));
-        points[1].push(solve(points[1][i - 1], points[0][i], a, a, riPi, g, r0,
-            findAndSumVectorPolar(points[0][i - 1], points[1][i - 1], points[0][i])));
+    let helpPoint = new PolarPoint(r, 0, h);
+
+    if (!isZero(beta))
+        helpPoint = solveEquations(new PolarPoint(helpPoint.r, beta > 0 ? 0.1 : -0.1, helpPoint.h),
+            helpPoint, points[0][0], cHelper, aHelper, riPi, g, r0);
+
+    let helpPointLeft = new PolarPoint(helpPoint.r, helpPoint.fi + 0.1, helpPoint.h);
+    let helpPointRight = new PolarPoint(helpPoint.r, helpPoint.fi - 0.1, helpPoint.h);
+
+    let solve = (p0, p1, p2) =>
+        solveEquations(findAndSumVectorPolar(p0, p1, p2), p1, p2, a, a, riPi, g, r0);
+
+    points[1].push(solveEquations(helpPointRight, points[0][0], helpPoint, a, bHelper, riPi, g, r0));
+    points[1].push(solveEquations(helpPointLeft, points[0][0], helpPoint, a, bHelper, riPi, g, r0));
+
+    points[0].push(solve(points[1][0], points[0][0], points[1][1], a));
+
+    let p = points[1][0].toPoint();
+    p.y -= a;
+
+
+    for (let i = 2; i <= n; i++) {
+        points[1].push(solve(points[0][i - 2], points[0][i - 1], points[1][i - 1]));
+        points[0].push(solve(points[1][i - 1], points[1][i], points[0][i - 1]));
     }
 
     for (let j = 2; j <= m; j++) {
-        points.push([]);
-        h = j * a * Math.cos(alpha);
-        r = r0 + j * a * Math.sin(alpha);
-        points[j].push(new PolarPoint(r, 0, h));
+        points.push([[], []]);
+        let [ti, ni] = j % 2 === 0 ? [0, 1] : [1, 0];
 
-        p = points[j][0].toPoint();
-        p.y -= a;
-        points[1][-1] = p.toPolarPoint();
-        for (let i = 1; i <= n; i++) {
-            points[j].push(solve(points[j][i - 1], points[j - 1][i], a, a, riPi, g, r0,
-                findAndSumVectorPolar(points[j - 1][i - 1], points[j][i - 1], points[j - 1][i])));
+        points[j][ti] = solve(points[j - 2][ti], points[j - 1][ni], points[j - 1][ti]);
+        points[j][ni] = solve(points[j - 1][ti], points[j - 1][ni], points[j][ti]);
+
+        for (let i = 2; i <= n; i++) {
+            points[j].push(solve(points[j - 1][i - 1], points[j - 1][i], points[j][i - 1]))
         }
     }
     console.log('newton iteration on one point: ', t / operation, t, operation);
