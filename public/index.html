@@ -69,7 +69,7 @@
         scene.add( group );
         // points
 
-        let r0 = 5, ri = 1, alpha = Math.PI / 100, n = 500, m = 100, beta = 0, a = 1;
+        let r0 = 3, ri = 1, alpha = Math.PI / 90, n = 200, m = 100, beta = 0, gamma = 0, a = 1;
         let maxZ = 0;
         var vertices = folding(r0, ri, n, m, alpha, beta, a).map(array => array.map(point => {
             maxZ = Math.max(maxZ, point.z);
@@ -77,9 +77,14 @@
         }));
 
         var material = [
-            new THREE.MeshStandardMaterial( { color : 0xe2dee0, side: THREE.DoubleSide, metalness: 0 } ),
             new THREE.LineBasicMaterial( { color: 0xed0600 } )
         ];
+        var meshMaterial = new THREE.MeshLambertMaterial( {
+            color: 0x000000,
+            opacity: 0.4,
+            transparent: true
+        } );
+        '#ffffff'
 
 
         var geometry = new THREE.Geometry();
@@ -90,7 +95,7 @@
         for (let j = 0; j <= m; j++) {
             for (let i = 0; i <= n; i++) {
                 vertices[j][i].z -= maxZ / 2;
-                geometry.vertices.push(vertices[j][i])
+                geometry.vertices.push(vertices[j][i]);
                 vertices[j][i].ind = geometry.vertices.length - 1;
             }
         }
@@ -102,45 +107,24 @@
             }
         }
 
-
-        //var line = new THREE.Line( geometry, material[1] );
-
-        //geometry.computeFaceNormals();
-        geometry.computeVertexNormals();
-
-        scene.add( new THREE.Mesh( geometry, material[0] ) );
-        //scene.add( line );
-
-        /*var pointsMaterial = new THREE.PointsMaterial( {
-            color: 0x0080ff,
+        var loader = new THREE.TextureLoader();
+        var texture = loader.load( 'textures/ball.png' );
+        var pointsMaterial = new THREE.PointsMaterial( {
+            color: 0xFF1A19,
             map: texture,
-            size: 1,
-            alphaTest: 0.5
+            size: 1.5,
+            opacity: 0.7,
+            alphaTest: 0.4
         } );
-        var pointsGeometry = new THREE.BufferGeometry().setFromPoints( vertices );
+        var pointsGeometry = new THREE.BufferGeometry().setFromPoints(
+            vertices.reduce((val, array, i) => [...val, ...array.filter((point, j) => (i + 3 + (-j % 3))% 3 > 0)], []) );
         var points = new THREE.Points( pointsGeometry, pointsMaterial );
         group.add( points );
-        // convex hull
-        var meshMaterial = new THREE.MeshLambertMaterial( {
-            color: 0xffffff,
-            opacity: 0.5,
-            transparent: true
-        } );
-        var meshGeometry = new THREE.ConvexBufferGeometry( vertices );
-        var mesh = new THREE.Mesh( meshGeometry, meshMaterial );
-        mesh.material.side = THREE.BackSide; // back faces
-        mesh.renderOrder = 0;
-        group.add( mesh );
-        var mesh = new THREE.Mesh( meshGeometry, meshMaterial.clone() );
-        mesh.material.side = THREE.FrontSide; // front faces
-        mesh.renderOrder = 1;
-        group.add( mesh );**/
-        //
+        geometry.computeVertexNormals();
+        scene.add( new THREE.Mesh( geometry, meshMaterial ) );
+
         window.addEventListener( 'resize', onWindowResize, false );
     }
-    // function randomPoint() {
-    // 	return new THREE.Vector3( THREE.Math.randFloat( - 1, 1 ), THREE.Math.randFloat( - 1, 1 ), THREE.Math.randFloat( - 1, 1 ) );
-    // }
     function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
