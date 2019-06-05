@@ -1,10 +1,9 @@
-const EPS = 1e-4;
+const EPS = 1e-7;
 const defaultRoundAmount = 7;
 
 function equals(a, b) {
     return Math.abs(a - b) < EPS;
 }
-
 
 function sign(a) {
     return isZero(a) ? 0 : (a < 0 ? -1 : 1);
@@ -26,7 +25,11 @@ function Point(x, y, z) {
 
     this.add = (a) => new Point(this.x + a.x, this.y + a.y, this.z + a.z);
     this.decrement = (a) => new Point(this.x - a.x, this.y - a.y, this.z - a.z);
+
+    this.lengthTo = (p) => Math.sqrt(sqr(this.x - p.x) + sqr(this.y - p.y) + sqr(this.z - p.z));
+
     this.toString = () => `(${this.x}, ${this.y}, ${this.z})`;
+
 
     this.toPolarPoint = () => new PolarPoint(Math.sqrt(sqr(this.x) + sqr(this.y)), Math.atan2(this.y, this.x), z);
 }
@@ -183,4 +186,57 @@ function folding(r0, ri, n, m, alpha, beta, a) {
     console.log('newton iteration on one point: ', t / operation, t, operation);
     points.map((elem, ind) => points[ind] = elem.map(point => point.toPoint()));
     return points;
+}
+
+function getCubsCoordinate(point, size) {
+    let x = Math.floor(point.x / size);
+    let y = Math.floor(point.y / size);
+    let z = Math.floor(point.z / size);
+    return [x, y, z];
+}
+
+function addPointToCub(cubs, size, point, i, j) {
+    if (point.isEmpty)
+        return null;
+    let [x, y, z] = getCubsCoordinate(point, size);
+
+    cubs[x] = cubs[x] === undefined ? [] : cubs[x];
+    cubs[x][y] = cubs[x][y] === undefined ? [] : cubs[x][y];
+    cubs[x][y][z] = cubs[x][y][z] === undefined ? [] : cubs[x][y][z];
+
+    cubs[x][y][z].push({ i, j });
+}
+
+function initCubs(points, size) {
+    let cubs = [];
+    points.map((array, i) => array.map((point, j) => addPointToCub(cubs, size, point, i, j)));
+    return cubs;
+}
+
+function getNeighbours(cubs, points, size, point) {
+    let [x, y, z] = getCubsCoordinate(point, size);
+    let ans = [];
+    for (let i = x - 1; i <= x + 1; i++) {
+        for (let j = y - 1; j <= y + 1; j++) {
+            for (let l = z - 1; l <= z + 1; l++) {
+                if (!cubs[i]) continue;
+                if (!cubs[i][j]) continue;
+                if (!cubs[i][j][l]) continue;
+                ans.push(...cubs[i][j][l]);
+            }
+        }
+    }
+    return ans;
+}
+
+function getPLJ(cubs, points, size, point, s1, s2) {
+    console.log(s1, s2);
+    let near = getNeighbours(cubs, points, size, point);
+    let potential = 0;
+    near.map(elem => {
+        let len = points[elem.i][elem.j].lengthTo(point);
+        if (isZero(len)) return;
+        potential += s1 / Math.pow(len, 12) - s2 / Math.pow(len, 6);
+    });
+    return potential;
 }
