@@ -40,7 +40,7 @@
     if ( WEBGL.isWebGLAvailable() === false ) {
         document.body.appendChild( WEBGL.getWebGLErrorMessage() );
     }
-    var group, camera, scene, renderer;
+    let group, camera, scene, renderer;
     init();
     animate();
     function init() {
@@ -54,20 +54,51 @@
         camera.position.set( 0, 50, 50 );
         scene.add( camera );
         // controls
-        var controls = new THREE.OrbitControls( camera, renderer.domElement );
+        let controls = new THREE.OrbitControls( camera, renderer.domElement );
         scene.add( new THREE.AmbientLight( 0x222222 ) );
         // light
-        var light = new THREE.PointLight( 0xffffff, 1 );
+        let light = new THREE.PointLight( 0xffffff, 1 );
         camera.add( light );
         // helper
         scene.background = new THREE.Color( 0xf0f0f0 );
-
-
         group = new THREE.Group();
         scene.add( group );
+
+        /*var grid = new THREE.GridHelper( 500, 500, 0xffffff, 0x555555 );
+        grid.rotateOnAxis( new THREE.Vector3( 0, 0, 1), 90 * ( Math.PI / 180 ) );
+        scene.add( grid );*/
+
+        const lineMaterial = [
+            new THREE.LineBasicMaterial( { color: 0xed0600 } )
+        ];
+        const meshMaterial = new THREE.MeshLambertMaterial( {
+            color: 0x000000,
+            opacity: 0.4,
+            transparent: true
+        } );
+
+        const loader = new THREE.TextureLoader();
+        const texture = loader.load( 'textures/ball.png' );
+        const pointsMaterial = new THREE.PointsMaterial( {
+            color: 0xFF1A19,
+            map: texture,
+            size: 1,
+            opacity: 0.7,
+            alphaTest: 0.4
+        } );
+        const newPointsMaterial = new THREE.PointsMaterial( {
+            color: 0x3B2BFF,
+            map: texture,
+            size: 1,
+            opacity: 0.7,
+            alphaTest: 0.4
+        } );
+
+
+
         // points
 
-        let r0 = 3, ri = 1, alpha =  0.0001, n = 2, m = 2, beta = -Math.PI / 8 * 0, a = 1;
+        let r0 = 3, ri = 1, alpha =  Math.PI / 2, n = 6, m = 6, beta = -Math.PI / 8 * 0, a = 1;
         let maxZ = 0, sigma = a / 1.11456, eps = 0.25;
         let size = sigma * 2.5;
         let s1 = 4 * eps * Math.pow(sigma, 12), s2 = 4 * eps * Math.pow(sigma, 6);
@@ -77,31 +108,24 @@
             point.number = i + j;
             return point;
         }));
-        let cubs = initCubs(originPoints, size);
+        cubs = [];
+        originPoints = buildup(cubs, size, originPoints, r0, ri, alpha, a);
 
 
-        var vertices = originPoints.map(array => array.map(point => {
-            maxZ = Math.max(maxZ, point.z);
-            return new THREE.Vector3(point.x, point.y, point.z)
-        }));
+        let vertices = [];
+        for (let j = 0; j <= m; j++) {
+            vertices.push([]);
+            for (let i = 0; i <= n; i++) {
+                let point = originPoints[j][i];
+                maxZ = Math.max(maxZ, point.z);
+                vertices[j].push(new THREE.Vector3(point.x, point.y, point.z));
+            }
+        }
 
-        var grid = new THREE.GridHelper( 500, 500, 0xffffff, 0x555555 );
-        grid.rotateOnAxis( new THREE.Vector3( 0, 0, 1), 90 * ( Math.PI / 180 ) );
-        scene.add( grid );
-
-        var material = [
-            new THREE.LineBasicMaterial( { color: 0xed0600 } )
-        ];
-        var meshMaterial = new THREE.MeshLambertMaterial( {
-            color: 0x000000,
-            opacity: 0.4,
-            transparent: true
-        } );
 
         var geometry = new THREE.Geometry();
         vertices.map(array => array.map(point => geometry.vertices.push(point)));
 
-        var color3 = new THREE.Color( 0xf9f3ff );
 
         for (let j = 0; j <= m; j++) {
             for (let i = 0; i <= n; i++) {
@@ -114,30 +138,44 @@
         for (let j = 1; j <= m; j++) {
             for (let i = 1; i <= n; i++) {
                 if (j % 2 === 1) {
-                    geometry.faces.push(new THREE.Face3(vertices[j - 1][i - 1].ind, vertices[j][i].ind, vertices[j - 1][i].ind, color3));
-                    geometry.faces.push(new THREE.Face3(vertices[j - 1][i - 1].ind, vertices[j][i].ind, vertices[j][i - 1].ind, color3))
+                    geometry.faces.push(new THREE.Face3(vertices[j - 1][i - 1].ind, vertices[j][i].ind, vertices[j - 1][i].ind, ));
+                    geometry.faces.push(new THREE.Face3(vertices[j - 1][i - 1].ind, vertices[j][i].ind, vertices[j][i - 1].ind, ))
                 } else {
-                    geometry.faces.push(new THREE.Face3(vertices[j][i - 1].ind, vertices[j - 1][i].ind, vertices[j][i].ind, color3));
-                    geometry.faces.push(new THREE.Face3(vertices[j][i - 1].ind, vertices[j - 1][i].ind, vertices[j - 1][i - 1].ind, color3))
+                    geometry.faces.push(new THREE.Face3(vertices[j][i - 1].ind, vertices[j - 1][i].ind, vertices[j][i].ind, ));
+                    geometry.faces.push(new THREE.Face3(vertices[j][i - 1].ind, vertices[j - 1][i].ind, vertices[j - 1][i - 1].ind, ))
                 }
             }
         }
-
-        var loader = new THREE.TextureLoader();
-        var texture = loader.load( 'textures/ball.png' );
-        var pointsMaterial = new THREE.PointsMaterial( {
-            color: 0xFF1A19,
-            map: texture,
-            size: 1,
-            opacity: 0.7,
-            alphaTest: 0.4
-        } );
-        var pointsGeometry = new THREE.BufferGeometry().setFromPoints(
-            vertices.reduce((val, array, i) => [...val, ...array.filter((point, j) => (j + i % 2 + 1) % 3 > 0)], []) );
-        var points = new THREE.Points( pointsGeometry, pointsMaterial );
-        group.add( points );
         geometry.computeVertexNormals();
         scene.add( new THREE.Mesh( geometry, meshMaterial ) );
+
+        let pointsForPointsGeometry = [];
+        for (let i = 0; i <= m; i++) {
+            for (let j = 0; j <= n; j++) {
+                if ((j + i % 2 + 1) % 3 > 0) {
+                    pointsForPointsGeometry.push(vertices[i][j])
+                }
+            }
+        }
+        let pointsGeometry = new THREE.BufferGeometry().setFromPoints(pointsForPointsGeometry);
+
+        let points = new THREE.Points( pointsGeometry, pointsMaterial );
+        group.add( points );
+
+        pointsForPointsGeometry = [];
+        for (let i in originPoints) {
+            for (let j in originPoints[i]) {
+                if ((i > m || j > n || j < 0 || i < 0) && isNotEmpty(i, j)) {
+                    let p = originPoints[i][j];
+                    pointsForPointsGeometry.push(new THREE.Vector3(p.x, p.y, p.z));
+                }
+            }
+        }
+        pointsGeometry = new THREE.BufferGeometry().setFromPoints(pointsForPointsGeometry);
+
+        points = new THREE.Points( pointsGeometry, newPointsMaterial );
+        group.add( points );
+
 
         window.addEventListener( 'resize', onWindowResize, false );
     }
