@@ -73,14 +73,15 @@
         ];
         const meshMaterial = new THREE.MeshLambertMaterial( {
             color: 0x000000,
-            opacity: 0.4,
+            opacity: 0.3,
             transparent: true
         } );
+        '#000000'
 
         const loader = new THREE.TextureLoader();
         const texture = loader.load( 'textures/ball.png' );
         const pointsMaterial = new THREE.PointsMaterial( {
-            color: 0xFF1A19,
+            color: 0xFFE184,
             map: texture,
             size: 1,
             opacity: 0.7,
@@ -98,7 +99,7 @@
 
         // points
 
-        let r0 = 3, ri = 1, alpha =  Math.PI / 2, n = 6, m = 6, beta = -Math.PI / 8 * 0, a = 1;
+        let r0 = 10, ri = 1, alpha =  Math.PI / 200, n = 200, m = 100, beta = -Math.PI / 8 * 0, a = 1;
         let maxZ = 0, sigma = a / 1.11456, eps = 0.25;
         let size = sigma * 2.5;
         let s1 = 4 * eps * Math.pow(sigma, 12), s2 = 4 * eps * Math.pow(sigma, 6);
@@ -108,8 +109,8 @@
             point.number = i + j;
             return point;
         }));
-        cubs = [];
-        originPoints = buildup(cubs, size, originPoints, r0, ri, alpha, a);
+        let cubs = [];
+        originPoints = buildup(cubs, size, originPoints, r0, ri, alpha, a, 100000);
 
 
         let vertices = [];
@@ -117,7 +118,7 @@
             vertices.push([]);
             for (let i = 0; i <= n; i++) {
                 let point = originPoints[j][i];
-                maxZ = Math.max(maxZ, point.z);
+                //maxZ = Math.max(maxZ, point.z);
                 vertices[j].push(new THREE.Vector3(point.x, point.y, point.z));
             }
         }
