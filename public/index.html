@@ -85,33 +85,35 @@
             map: texture,
             size: 1,
             opacity: 0.7,
-            alphaTest: 0.4
+            alphaTest: 0.2
         } );
         const newPointsMaterial = new THREE.PointsMaterial( {
             color: 0x3B2BFF,
             map: texture,
             size: 1,
             opacity: 0.7,
-            alphaTest: 0.4
+            alphaTest: 0.2
         } );
 
 
 
         // points
 
-        let r0 = 10, ri = 1, alpha =  Math.PI / 200, n = 200, m = 100, beta = -Math.PI / 8 * 0, a = 1;
+        let r0 = 3, ri = 1, alpha =  Math.PI / 4000, n = 100, m = 100, beta = Math.PI / 8 * 0, a = 1;
         let maxZ = 0, sigma = a / 1.11456, eps = 0.25;
-        let size = sigma * 2.5;
+        let size = sigma * 2, energyMaximum = -4.1, maxHexAmount = 1000;
         let s1 = 4 * eps * Math.pow(sigma, 12), s2 = 4 * eps * Math.pow(sigma, 6);
         let originPoints = folding(r0, ri, n, m, alpha, beta, a);
         originPoints = originPoints.map((array, i) => array.map((point, j) => {
             point.isEmpty = (j + i % 2 + 1) % 3 === 0;
-            point.number = i + j;
+            point.isBimbo = false;
             return point;
         }));
-        let cubs = [];
-        originPoints = buildup(cubs, size, originPoints, r0, ri, alpha, a, 100000);
+        let cubs = initCubs(originPoints, size);
+        let t = Date.now();
 
+        originPoints = buildup(cubs, size, originPoints, r0, ri, alpha, a, maxHexAmount, energyMaximum, s1, s2);
+        console.log(Date.now() - t);
 
         let vertices = [];
         for (let j = 0; j <= m; j++) {
@@ -124,7 +126,7 @@
         }
 
 
-        var geometry = new THREE.Geometry();
+        let geometry = new THREE.Geometry();
         vertices.map(array => array.map(point => geometry.vertices.push(point)));
 
 
@@ -166,8 +168,8 @@
         pointsForPointsGeometry = [];
         for (let i in originPoints) {
             for (let j in originPoints[i]) {
-                if ((i > m || j > n || j < 0 || i < 0) && isNotEmpty(i, j)) {
-                    let p = originPoints[i][j];
+                let p = originPoints[i][j];
+                if ((i > m || j > n) && isNotEmpty(i, j) && !p.isBimbo) {
                     pointsForPointsGeometry.push(new THREE.Vector3(p.x, p.y, p.z));
                 }
             }

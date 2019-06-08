@@ -1,13 +1,5 @@
 const EPS = 1e-7;
 
-function equals(a, b) {
-    return Math.abs(a - b) < EPS;
-}
-
-function isZero(a) {
-    return equals(a, 0);
-}
-
 function Point(x, y, z, isEmpty = false, isBimbo = false) {
     this.x = x;
     this.y = y;
@@ -18,6 +10,7 @@ function Point(x, y, z, isEmpty = false, isBimbo = false) {
     this.decrement = (a) => new Point(this.x - a.x, this.y - a.y, this.z - a.z);
 
     this.lengthTo = (p) => Math.sqrt(sqr(this.x - p.x) + sqr(this.y - p.y) + sqr(this.z - p.z));
+    this.sqrLengthTo = (p) => sqr(this.x - p.x) + sqr(this.y - p.y) + sqr(this.z - p.z);
 
     this.toString = () => `(${this.x}, ${this.y}, ${this.z})`;
 
@@ -38,7 +31,63 @@ function PolarPoint(r, fi, h, isEmpty = false, isBimbo = false) {
     this.equals = (p) => equals(p.r, this.r) && equals(p.fi, this.fi) && equals(p.h, this.h);
 }
 
-let sqr = a => a * a;
+function CircleList() {
+    function Elem(p0, p1, p2, prev, next) {
+        this.prev = prev;
+        this.next = next;
+        this.p0 = p0;
+        this.p1 = p1;
+        this.p2 = p2;
+    }
+    let root = new Elem();
+
+    let pointer = root;
+    root.prev = root.next = root;
+
+    this.push = (p0, p1, p2) => {
+        let elem = new Elem(p0, p1, p2, root.prev, root);
+        root.prev.next = elem;
+        root.prev = elem;
+    };
+
+    this.shift = (p0, p1, p2) => {
+        let elem = new Elem(p0, p1, p2, root, root.next);
+        root.next.prev = elem;
+        root.next = elem;
+    };
+
+    this.headValue = () => {
+        if (pointer === root)
+            return null;
+        return pointer;
+    };
+
+    this.next = () => {
+        pointer = pointer.next;
+        return this.headValue();
+    };
+
+    this.deleteHead = () => {
+        let val = this.headValue();
+        if (val) {
+            val.prev.next = val.next;
+            val.next.prev = val.prev;
+        }
+        return val;
+    }
+}
+
+function equals(a, b) {
+    return Math.abs(a - b) < EPS;
+}
+
+function isZero(a) {
+    return equals(a, 0);
+}
+
+function sqr(a) {
+    return a * a;
+}
 
 //init newton iteration
 //return function which return subtrahend for newton iteration x(k+1) by x(k)
@@ -162,19 +211,22 @@ function getCubsCoordinate(point, size) {
     return [x, y, z];
 }
 
-function addPointToCub(cubs, size, point) {
-    let [x, y, z] = getCubsCoordinate(point, size);
+function addPointToCub(cubs, size, point, i, j) {
+    let p = point.toPoint();
+    let [x, y, z] = getCubsCoordinate(p, size);
 
     cubs[x] = cubs[x] === undefined ? [] : cubs[x];
     cubs[x][y] = cubs[x][y] === undefined ? [] : cubs[x][y];
     cubs[x][y][z] = cubs[x][y][z] === undefined ? [] : cubs[x][y][z];
+    p.i = i;
+    p.j = j;
 
-    cubs[x][y][z].push(point);
+    cubs[x][y][z].push(p);
 }
 
 function initCubs(points, size) {
     let cubs = [];
-    points.map(array => array.map(point => addPointToCub(cubs, size, point)));
+    points.map((array, i) => array.map((point, j) => addPointToCub(cubs, size, point, i, j)));
     return cubs;
 }
 
@@ -182,12 +234,22 @@ function isNotEmpty(i, j) {
     return ((j + (i % 2 + 2) % 2 + 1) % 3 + 3) % 3 > 0;
 }
 
-function getNeighbours(cubs, size, point) {
-    let [x, y, z] = getCubsCoordinate(point, size);
+function getNeighbours(cubs, size, args) {
+    let [x, y, z] = getCubsCoordinate(args[0], size);
+    let xmin = x - 1, xmax = x + 1, ymin = y - 1, ymax = y + 1, zmin = z - 1, zmax = z + 1;
+    for (let i in args) {
+        [x, y, z] = getCubsCoordinate(args[i], size);
+        xmin = Math.min(xmin, x - 1);
+        xmax = Math.max(xmax, x + 1);
+        ymin = Math.min(ymin, y - 1);
+        ymax = Math.max(ymax, y + 1);
+        zmin = Math.min(zmin, z - 1);
+        zmax = Math.max(zmax, z + 1);
+    }
     let ans = [];
-    for (let i = x - 1; i <= x + 1; i++) {
-        for (let j = y - 1; j <= y + 1; j++) {
-            for (let l = z - 1; l <= z + 1; l++) {
+    for (let i = xmin; i <= xmax; i++) {
+        for (let j = ymin; j <= ymax; j++) {
+            for (let l = zmin; l <= zmax; l++) {
                 if (!cubs[i]) continue;
                 if (!cubs[i][j]) continue;
                 if (!cubs[i][j][l]) continue;
@@ -198,31 +260,49 @@ function getNeighbours(cubs, size, point) {
     return ans;
 }
 
-function twoPointPotential(a, b, s1, s2) {
-    if (a.isEmpty || b.isEmpty || a.isBimbo || b.isBimbo) return 0;
+function twoPointPotential(a, b, s1, s2, size, force = false) {
+    if (!force && (a.isEmpty || b.isEmpty || a.isBimbo || b.isBimbo)) return 0;
 
-    let len = a.lengthTo(b);
+    let sqrLen = a.sqrLengthTo(b);
 
-    if (isZero(len)) return 0;
+    if (isZero(sqrLen) || sqrLen > size * size) return 0;
 
-    return s1 / Math.pow(len, 12) - s2 / Math.pow(len, 6);
+    let len6 = Math.pow(sqrLen, 3);
+    return s1 / sqr(len6) - s2 / len6;
 }
 
-function getPLJ(cubs, size, point, s1, s2) {
-    let near = getNeighbours(cubs, size, point);
+function getPLJ(cubs, size, args, s1, s2) {
+    let points = args.map(point => point.toPoint());
+    let near = getNeighbours(cubs, size, points);
     let potential = 0;
     for (let i in near) {
-        potential += twoPointPotential(near[i], point, s1, s2);
+        for (let j in points) {
+            potential += twoPointPotential(near[i], points[j], s1, s2, size);
+        }
     }
+    for (let i in points) {
+        for (let j in points) {
+            if ((i > j) && (points[i].isBimbo || points[j].isBimbo)) {
+                potential += twoPointPotential(points[i], points[j], s1, s2, size, true);
+            }
+            if ((i < j) && (!points[i].isBimbo && !points[j].isBimbo)) {
+                potential -= twoPointPotential(points[i], points[j], s1, s2, size, true);
+            }
+        }
+    }
+    //console.log(potential)
     return potential;
 }
 
-function makeRealPoint(point, isEmpty) {
+function makeRealPoint(cubs, size, elem, point, isEmpty) {
     point.isBimbo = false;
     point.isEmpty = isEmpty;
+    if (!isEmpty) {
+        addPointToCub(cubs, size, point, elem.i, elem.j);
+    }
 }
 
-function buildHex(points, solve, ind0, ind1, ind2) {
+function buildHex(cubs, size, s1, s2, points, solve, energyMaximum = 0, ind0, ind1, ind2) {
     let getPoint = elem => points[elem.i][elem.j];
     let makePoint = (ind0, ind1, ind2) => {
         let i = ind1.i + ind2.i - ind0.i;
@@ -236,81 +316,44 @@ function buildHex(points, solve, ind0, ind1, ind2) {
         return {i, j};
     };
     let hex = [ind1, ind2];
-    let indC = makePoint(ind0, ind1, ind2);
-    hex[5] = makePoint(hex[1], hex[0], indC);
-    hex[2] = makePoint(hex[0], hex[1], indC);
-    hex[3] = makePoint(hex[1], hex[2], indC);
-    hex[4] = makePoint(hex[0], hex[5], indC);
+    hex[-1] = makePoint(ind0, ind1, ind2);
+    hex[5] = makePoint(hex[1], hex[0], hex[-1]);
+    hex[2] = makePoint(hex[0], hex[1], hex[-1]);
+    hex[3] = makePoint(hex[1], hex[2], hex[-1]);
+    hex[4] = makePoint(hex[0], hex[5], hex[-1]);
 
-    if (true) {
-        for (let i = 0; i < 6; i++) {
-            makeRealPoint(getPoint(hex[i]));
+    let isNew = false, isNegate = false, args = [];
+    for (let i = 0; i < 6; i++) {
+        if (getPoint(hex[i]).isBimbo)
+            isNew = true;
+        if (hex[i].i < 0 || hex[i].j < 0) {
+            isNegate = true;
         }
-        hex[-1] = indC;
+        args.push(getPoint(hex[i]));
+    }
+    let energy = getPLJ(cubs, size, args, s1, s2);
+
+    if (isNew && !isNegate && energy < energyMaximum) {
+        for (let i = 0; i < 6; i++) {
+            makeRealPoint(cubs, size, hex[i], getPoint(hex[i]), false);
+        }
+        makeRealPoint(cubs, size, hex[-1], getPoint(hex[-1]), true);
         return hex;
     }
     return null;
 }
-
-function CircleList() {
-    function Elem(p0, p1, p2, prev, next) {
-        this.prev = prev;
-        this.next = next;
-        this.p0 = p0;
-        this.p1 = p1;
-        this.p2 = p2;
-    }
-    let root = new Elem();
-
-    let pointer = root;
-    root.prev = root.next = root;
-
-    this.push = (p0, p1, p2) => {
-        let elem = new Elem(p0, p1, p2, root.prev, root);
-        root.prev.next = elem;
-        root.prev = elem;
-    };
-
-    this.shift = (p0, p1, p2) => {
-        let elem = new Elem(p0, p1, p2, root, root.next);
-        root.next.prev = elem;
-        root.next = elem;
-    };
-
-    this.headValue = () => {
-        if (pointer === root)
-            return null;
-        return pointer;
-    };
-
-    this.next = () => {
-        pointer = pointer.next;
-        return this.headValue();
-    };
-
-    this.deleteHead = () => {
-        let val = this.headValue();
-        if (val) {
-            val.prev.next = val.next;
-            val.next.prev = val.prev;
-        }
-        return val;
-    }
-}
-
-function buildup(cubs, size, points, r0, ri, alpha, a, amountHex) {
+let tt = 0;
+function buildup(cubs, size, points, r0, ri, alpha, a, amountHex, energyMaximum = 0, s1, s2) {
     let riPi = ri / (2 * Math.PI);
     let g = Math.tan(alpha);
     let solve = (p0, p1, p2) => {
         let point = solveEquations(findAndSumVectorPolar(p0, p1, p2), p1, p2, a, a, riPi, g, r0);
         point.isBimbo = true;
         point.isEmpty = true;
-        //addPointToCub(cubs, size, point)
         return point;
     };
     let makeElem = (i, j) => ({i, j});
-    let makeHex = (ind0, ind1, ind2) => buildHex(points, solve, ind0, ind1, ind2);
-
+    let makeHex = (ind0, ind1, ind2) => buildHex(cubs, size, s1, s2, points, solve, energyMaximum, ind0, ind1, ind2);
     let len = points[0].length - 1, last, init;
     switch (len % 3) {
         case 0: last = len; init = 0; break;
@@ -328,15 +371,19 @@ function buildup(cubs, size, points, r0, ri, alpha, a, amountHex) {
             list.push(makeElem(last - 1, i - init), makeElem(last, i), makeElem(last - 1, i + 1 - init));
         }
     }
-    let cur, hex, buildupHex = 0;
+    let cur, hex, buildupHex = 0, wasChange = false;
     while(buildupHex < amountHex) {
         cur = list.next();
         if (!cur) {
+            if (!wasChange)
+                break;
+            wasChange = false;
             continue;
         }
 
         hex = makeHex(cur.p0, cur.p1, cur.p2);
         if (hex) {
+            wasChange = true;
             list.deleteHead();
             buildupHex++;
             list.shift(hex[-1], hex[3], hex[4]);
@@ -350,5 +397,3 @@ function buildup(cubs, size, points, r0, ri, alpha, a, amountHex) {
     }
     return points;
 }
-
-
